@@ -35,9 +35,9 @@ export async function generateContentWithFallback(
         },
       });
 
-      // Tạo timeout 6s cho mỗi model để fail-fast nếu Google bị nghẽn
+      // Tạo timeout 12s cho mỗi model để fail-fast nếu Google bị nghẽn hoàn toàn
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`Timeout 6s cho model ${modelName}`)), 6000)
+        setTimeout(() => reject(new Error(`Timeout 12s cho model ${modelName}`)), 12000)
       );
 
       const generatePromise = model.generateContent(prompt).then((res) => res.response.text());

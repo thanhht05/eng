@@ -17,6 +17,7 @@ import {
   FileText,
 } from "lucide-react";
 import { soundFx } from "@/lib/sound";
+import { savePracticeRecord } from "@/lib/history";
 
 interface EssayPromptData {
   title: string;
@@ -130,6 +131,19 @@ export const EssayPractice: React.FC<EssayPracticeProps> = ({
 
       setEvaluation(data);
       soundFx.playSuccess();
+
+      // Lưu lịch sử bài luận
+      savePracticeRecord({
+        type: "essay",
+        level: data.estimatedLevel || "A2-B1",
+        topic: essayPrompt.title,
+        vietnamese: essayPrompt.titleVi,
+        userText: essayText.trim(),
+        score: data.overallScore,
+        overallFeedback: data.summary,
+        modelAnswer: data.improvedEssay,
+        isMistake: data.overallScore < 75,
+      });
 
       if (data.overallScore >= 80) {
         confetti({

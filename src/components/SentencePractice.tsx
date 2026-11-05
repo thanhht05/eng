@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import confetti from "canvas-confetti";
 import {
   Sparkles,
@@ -12,8 +12,10 @@ import {
   ArrowRight,
   TrendingUp,
   Award,
+  RefreshCw,
 } from "lucide-react";
 import { soundFx } from "@/lib/sound";
+import { PracticeRecord, savePracticeRecord, markRecordMastered } from "@/lib/history";
 
 interface SentenceData {
   vietnamese: string;
@@ -48,6 +50,9 @@ interface EvaluationResult {
 interface SentencePracticeProps {
   apiKey: string;
   openApiKeyModal: () => void;
+  similarRequest?: PracticeRecord | null;
+  onClearSimilarRequest?: () => void;
+  onHistoryUpdate?: () => void;
 }
 
 const TOPICS = [
@@ -63,6 +68,9 @@ const TOPICS = [
 export const SentencePractice: React.FC<SentencePracticeProps> = ({
   apiKey,
   openApiKeyModal,
+  similarRequest,
+  onClearSimilarRequest,
+  onHistoryUpdate,
 }) => {
   const [level, setLevel] = useState<"A2" | "B1">("A2");
   const [selectedTopic, setSelectedTopic] = useState(TOPICS[0]);
@@ -74,9 +82,27 @@ export const SentencePractice: React.FC<SentencePracticeProps> = ({
   const [userTranslation, setUserTranslation] = useState("");
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [activeRetryRecordId, setActiveRetryRecordId] = useState<string | null>(null);
 
-  // Generate new sentence
-  const handleGenerateSentence = async () => {
+  // Listen to similar request from History Drawer
+  useEffect(() => {
+    if (similarRequest) {
+      setActiveRetryRecordId(similarRequest.id);
+      handleGenerateSentence({
+        targetPattern: similarRequest.patternName,
+        retryMistakeContext: similarRequest.grammarErrors?.[0]
+          ? `Lỗi: ${similarRequest.grammarErrors[0].mistake} -> Sửa: ${similarRequest.grammarErrors[0].correction} (${similarRequest.grammarErrors[0].explanation})`
+          : undefined,
+      });
+      if (onClearSimilarRequest) onClearSimilarRequest();
+    }
+  }, [similarRequest]);
+
+  // Generate new sentence (standard or retry similar)
+  const handleGenerateSentence = async (retryParams?: {
+    targetPattern?: string;
+    retryMistakeContext?: string;
+  }) => {
     setIsGenerating(true);
     setErrorMsg(null);
     setResult(null);
@@ -91,6 +117,8 @@ export const SentencePractice: React.FC<SentencePracticeProps> = ({
           level,
           topic: selectedTopic,
           customApiKey: apiKey || undefined,
+          targetPattern: retryParams?.targetPattern,
+          retryMistakeContext: retryParams?.retryMistakeContext,
         }),
       });
 
@@ -136,6 +164,33 @@ export const SentencePractice: React.FC<SentencePracticeProps> = ({
 
       setResult(data);
       soundFx.playSuccess();
+
+      // Lưu vào Lịch sử & Sổ tay lỗi sai
+      const hasErrors = data.score < 80 || (data.grammarErrors && data.grammarErrors.length > 0);
+      savePracticeRecord({
+        type: "sentence",
+        level,
+        topic: currentPrompt.topic,
+        vietnamese: currentPrompt.vietnamese,
+        userText: userTranslation.trim(),
+        score: data.score,
+        patternName: currentPrompt.patternName,
+        grammarTarget: currentPrompt.grammarTarget,
+        overallFeedback: data.overallFeedback,
+        grammarErrors: data.grammarErrors,
+        modelAnswer: data.modelAnswers?.[0]?.sentence,
+        isMistake: hasErrors,
+      });
+
+      // Nếu đang luyện lại câu sai trước đó và đã đạt điểm cao >= 80, đánh dấu đã khắc phục!
+      if (activeRetryRecordId && data.score >= 80) {
+        markRecordMastered(activeRetryRecordId);
+        setActiveRetryRecordId(null);
+      }
+
+      if (onHistoryUpdate) {
+        onHistoryUpdate();
+      }
 
       // Trigger celebration confetti if score is high
       if (data.score >= 80) {
@@ -207,7 +262,7 @@ export const SentencePractice: React.FC<SentencePracticeProps> = ({
         </div>
 
         <button
-          onClick={handleGenerateSentence}
+          onClick={() => handleGenerateSentence()}
           disabled={isGenerating}
           className="flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50"
         >
@@ -245,7 +300,7 @@ export const SentencePractice: React.FC<SentencePracticeProps> = ({
             Hệ thống AI sẽ tạo ngẫu nhiên một câu văn bản tiếng Việt phù hợp trình độ {level}. Bạn sẽ dịch sang tiếng Anh và AI sẽ chấm bài tức thì.
           </p>
           <button
-            onClick={handleGenerateSentence}
+            onClick={() => handleGenerateSentence()}
             className="inline-flex items-center space-x-2 px-6 py-3 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-xl shadow-indigo-600/30 transition-all hover:scale-105"
           >
             <Sparkles className="w-5 h-5" />
@@ -258,7 +313,7 @@ export const SentencePractice: React.FC<SentencePracticeProps> = ({
         <div className="p-12 text-center border border-slate-800 rounded-3xl bg-slate-900/40">
           <RotateCw className="w-8 h-8 text-indigo-400 animate-spin mx-auto mb-3" />
           <p className="text-sm text-slate-300 font-medium">
-            Gemini đang sáng tạo câu tiếng Việt trình độ {level}...
+            Gemini đang thiết kế câu tiếng Việt tự nhiên...
           </p>
         </div>
       )}
@@ -406,13 +461,34 @@ export const SentencePractice: React.FC<SentencePracticeProps> = ({
                   </div>
                 </div>
 
-                <button
-                  onClick={handleGenerateSentence}
-                  className="flex items-center space-x-2 px-5 py-3 rounded-xl font-bold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 shadow-md transition-all flex-shrink-0"
-                >
-                  <RotateCw className="w-4 h-4 text-indigo-400" />
-                  <span>Luyện câu tiếp theo</span>
-                </button>
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 flex-shrink-0">
+                  {/* Nếu làm sai hoặc điểm < 80, nút này sẽ hiện ra nổi bật */}
+                  {(result.score < 80 || (result.grammarErrors && result.grammarErrors.length > 0)) &&
+                    currentPrompt.patternName && (
+                      <button
+                        onClick={() =>
+                          handleGenerateSentence({
+                            targetPattern: currentPrompt.patternName,
+                            retryMistakeContext: result.grammarErrors?.[0]
+                              ? `Lỗi: ${result.grammarErrors[0].mistake} -> Sửa: ${result.grammarErrors[0].correction}`
+                              : undefined,
+                          })
+                        }
+                        className="flex items-center space-x-2 px-5 py-3 rounded-xl font-bold bg-gradient-to-r from-rose-600 via-pink-600 to-purple-600 hover:from-rose-500 hover:to-purple-500 text-white shadow-lg shadow-rose-600/25 transition-all hover:scale-[1.02]"
+                      >
+                        <RefreshCw className="w-4 h-4 animate-spin-slow" />
+                        <span>Luyện 1 câu tương tự để sửa lỗi</span>
+                      </button>
+                    )}
+
+                  <button
+                    onClick={() => handleGenerateSentence()}
+                    className="flex items-center space-x-2 px-5 py-3 rounded-xl font-bold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 shadow-md transition-all"
+                  >
+                    <RotateCw className="w-4 h-4 text-indigo-400" />
+                    <span>Luyện câu tiếp theo</span>
+                  </button>
+                </div>
               </div>
 
               {/* Model Answers */}
@@ -504,4 +580,3 @@ export const SentencePractice: React.FC<SentencePracticeProps> = ({
     </div>
   );
 };
-

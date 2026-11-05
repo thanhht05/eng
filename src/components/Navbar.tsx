@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Sparkles, Key, Volume2, VolumeX, BookOpen, PenTool } from "lucide-react";
+import { Sparkles, Key, Volume2, VolumeX, BookOpen, PenTool, History } from "lucide-react";
 import { soundFx } from "@/lib/sound";
 
 interface NavbarProps {
@@ -11,6 +11,8 @@ interface NavbarProps {
   setSoundEnabled: (enabled: boolean) => void;
   openApiKeyModal: () => void;
   hasCustomKey: boolean;
+  openHistoryDrawer: () => void;
+  mistakesCount?: number;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -20,6 +22,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   setSoundEnabled,
   openApiKeyModal,
   hasCustomKey,
+  openHistoryDrawer,
+  mistakesCount = 0,
 }) => {
   const toggleSound = () => {
     const nextState = !soundEnabled;
@@ -87,6 +91,21 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Actions */}
         <div className="flex items-center space-x-2">
+          {/* History & Mistake Notebook */}
+          <button
+            onClick={openHistoryDrawer}
+            title="Xem lịch sử và sổ tay câu làm sai"
+            className="relative flex items-center space-x-1.5 text-xs px-3 py-2 rounded-lg border bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800 hover:border-slate-700 transition-all"
+          >
+            <History className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="hidden sm:inline">Lịch sử & Lỗi sai</span>
+            {mistakesCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-bold">
+                {mistakesCount}
+              </span>
+            )}
+          </button>
+
           {/* Sound Toggle */}
           <button
             onClick={toggleSound}
@@ -119,4 +138,3 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
-

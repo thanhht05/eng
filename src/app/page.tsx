@@ -3,16 +3,26 @@
 import React, { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { ApiKeyModal } from "@/components/ApiKeyModal";
+import { HistoryDrawer } from "@/components/HistoryDrawer";
 import { SentencePractice } from "@/components/SentencePractice";
 import { EssayPractice } from "@/components/EssayPractice";
 import { soundFx } from "@/lib/sound";
-import { Sparkles, Shield, Cpu, Flame, Target } from "lucide-react";
+import { PracticeRecord, getMistakeRecords } from "@/lib/history";
+import { Cpu, Flame } from "lucide-react";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"sentence" | "essay">("sentence");
   const [apiKey, setApiKey] = useState<string>("");
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(false);
+  const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState<boolean>(false);
+  const [mistakesCount, setMistakesCount] = useState<number>(0);
+  const [similarRequest, setSimilarRequest] = useState<PracticeRecord | null>(null);
+
+  const refreshMistakesCount = () => {
+    const mistakes = getMistakeRecords();
+    setMistakesCount(mistakes.length);
+  };
 
   useEffect(() => {
     // Load persisted settings
@@ -27,6 +37,8 @@ export default function Home() {
       setSoundEnabled(isEnabled);
       soundFx.enabled = isEnabled;
     }
+
+    refreshMistakesCount();
   }, []);
 
   const handleSaveApiKey = (key: string) => {
@@ -40,6 +52,11 @@ export default function Home() {
     localStorage.setItem("engsprint_sound_enabled", String(enabled));
   };
 
+  const handlePracticeSimilarFromHistory = (record: PracticeRecord) => {
+    setActiveTab("sentence");
+    setSimilarRequest(record);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
       {/* Navbar */}
@@ -50,6 +67,8 @@ export default function Home() {
         setSoundEnabled={handleToggleSound}
         openApiKeyModal={() => setIsApiKeyModalOpen(true)}
         hasCustomKey={Boolean(apiKey)}
+        openHistoryDrawer={() => setIsHistoryDrawerOpen(true)}
+        mistakesCount={mistakesCount}
       />
 
       {/* Main Container */}
@@ -90,6 +109,9 @@ export default function Home() {
           <SentencePractice
             apiKey={apiKey}
             openApiKeyModal={() => setIsApiKeyModalOpen(true)}
+            similarRequest={similarRequest}
+            onClearSimilarRequest={() => setSimilarRequest(null)}
+            onHistoryUpdate={refreshMistakesCount}
           />
         ) : (
           <EssayPractice
@@ -115,7 +137,12 @@ export default function Home() {
               Cài đặt API Key
             </button>
             <span>•</span>
-            <span>Mức độ: A2 - B1</span>
+            <button
+              onClick={() => setIsHistoryDrawerOpen(true)}
+              className="hover:text-indigo-400 transition-colors"
+            >
+              Lịch sử & Sổ tay lỗi sai ({mistakesCount})
+            </button>
           </div>
         </div>
       </footer>
@@ -127,7 +154,16 @@ export default function Home() {
         apiKey={apiKey}
         onSaveKey={handleSaveApiKey}
       />
+
+      {/* History & Mistake Notebook Drawer */}
+      <HistoryDrawer
+        isOpen={isHistoryDrawerOpen}
+        onClose={() => {
+          setIsHistoryDrawerOpen(false);
+          refreshMistakesCount();
+        }}
+        onPracticeSimilar={handlePracticeSimilarFromHistory}
+      />
     </div>
   );
 }
-

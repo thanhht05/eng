@@ -73,13 +73,37 @@ const PERSPECTIVES = [
 
 export async function POST(req: NextRequest) {
   try {
-    const { topic, level, customApiKey } = await req.json().catch(() => ({}));
+    const {
+      topic,
+      level,
+      customApiKey,
+      targetPattern,
+      retryMistakeContext,
+    } = await req.json().catch(() => ({}));
 
-    // Randomly pick a structural blueprint to guarantee variety every time
-    const selectedStructure =
-      DIVERSE_STRUCTURES[Math.floor(Math.random() * DIVERSE_STRUCTURES.length)];
+    // Nếu người dùng yêu cầu luyện lại cấu trúc đã làm sai, dùng đúng cấu trúc đó
+    let selectedStructure = DIVERSE_STRUCTURES.find(
+      (s) => s.type === targetPattern || s.grammarTarget === targetPattern
+    );
+
+    if (!selectedStructure) {
+      selectedStructure =
+        DIVERSE_STRUCTURES[Math.floor(Math.random() * DIVERSE_STRUCTURES.length)];
+    }
+
     const selectedPerspective =
       PERSPECTIVES[Math.floor(Math.random() * PERSPECTIVES.length)];
+
+    const isRetryMode = Boolean(targetPattern || retryMistakeContext);
+
+    const retryInstruction = isRetryMode
+      ? `
+ĐẶC BIỆT LƯU Ý (CHẾ ĐỘ RÈN LUYỆN KHẮC PHỤC LỖI SAI):
+- Học viên vừa làm sai câu trước có cấu trúc "${selectedStructure.type}" (${selectedStructure.grammarTarget}).
+- Lỗi cụ thể học viên đã mắc: "${retryMistakeContext || "chưa nắm vững ngữ pháp cấu trúc này"}".
+- Mục tiêu: Hãy tạo một câu tiếng Việt MỚI CÙNG DẠNG CẤU TRÚC VÀ NGỮ PHÁP NÀY nhưng trong tình huống khác, để học viên thực hành lại và sửa chữa đúng lỗi sai đó!
+`
+      : "";
 
     const prompt = `
 Bạn là một chuyên gia giáo dục tiếng Anh hàng đầu cho học viên trình độ A2 - B1 (CEFR).
@@ -93,6 +117,7 @@ THÔNG TIN BẮT BUỘC:
 - Hướng dẫn chi tiết: ${selectedStructure.instruction}
 - Góc nhìn / Ngôi xưng ưu tiên: ${selectedPerspective}
 - Ví dụ tham khảo về phong cách: "${selectedStructure.example}"
+${retryInstruction}
 
 NGUYÊN TẮC CHỐNG LẶP LẠI (CỰC KỲ QUAN TRỌNG):
 1. TUYỆT ĐỐI CẤM các cấu trúc rập khuôn nhàm chán như:
@@ -116,7 +141,7 @@ Trả về ĐÚNG ĐỊNH DẠNG JSON sau (không kèm markdown ngoài JSON):
 `;
 
     const text = await generateContentWithFallback(prompt, customApiKey, {
-      temperature: 0.9, // High creativity to avoid repetition
+      temperature: 0.85,
     });
     const data = JSON.parse(text);
 
