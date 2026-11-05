@@ -10,7 +10,8 @@ const FALLBACK_MODELS = [
 
 export async function generateContentWithFallback(
   prompt: string,
-  customApiKey?: string
+  customApiKey?: string,
+  options?: { temperature?: number; topP?: number }
 ): Promise<string> {
   const apiKey = customApiKey || process.env.GEMINI_API_KEY;
 
@@ -28,8 +29,8 @@ export async function generateContentWithFallback(
       const model = genAI.getGenerativeModel({
         model: modelName,
         generationConfig: {
-          temperature: 0.7,
-          topP: 0.95,
+          temperature: options?.temperature ?? 0.8,
+          topP: options?.topP ?? 0.95,
           responseMimeType: "application/json",
         },
       });

@@ -20,6 +20,8 @@ interface SentenceData {
   topic: string;
   level: string;
   hints: string[];
+  patternName?: string;
+  grammarTarget?: string;
 }
 
 interface GrammarError {
@@ -267,14 +269,24 @@ export const SentencePractice: React.FC<SentencePracticeProps> = ({
           <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800/80 shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                   {currentPrompt.level}
                 </span>
                 <span className="text-xs text-slate-400 font-medium">
                   {currentPrompt.topic}
                 </span>
+                {currentPrompt.patternName && (
+                  <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                    🎯 {currentPrompt.patternName}
+                  </span>
+                )}
+                {currentPrompt.grammarTarget && (
+                  <span className="text-xs px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 font-mono text-[11px] hidden sm:inline-block">
+                    {currentPrompt.grammarTarget}
+                  </span>
+                )}
               </div>
 
               {currentPrompt.hints && currentPrompt.hints.length > 0 && (
