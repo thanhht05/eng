@@ -1,10 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const FALLBACK_MODELS = [
+// Ưu tiên các model siêu tốc (Flash-Lite) trước để phản hồi trong dưới 1 giây
+const FAST_MODELS = [
   "gemini-3.1-flash-lite",
-  "gemini-3.8-flash",
   "gemini-3.5-flash-lite",
-  "gemini-flash-latest",
+  "gemini-3.8-flash",
   "gemini-flash-lite-latest",
 ];
 
@@ -24,7 +24,7 @@ export async function generateContentWithFallback(
   const genAI = new GoogleGenerativeAI(apiKey);
   let lastError: any = null;
 
-  for (const modelName of FALLBACK_MODELS) {
+  for (const modelName of FAST_MODELS) {
     try {
       const model = genAI.getGenerativeModel({
         model: modelName,
@@ -35,19 +35,25 @@ export async function generateContentWithFallback(
         },
       });
 
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
+      // Tạo timeout 6s cho mỗi model để fail-fast nếu Google bị nghẽn
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Timeout 6s cho model ${modelName}`)), 6000)
+      );
+
+      const generatePromise = model.generateContent(prompt).then((res) => res.response.text());
+
+      const text = await Promise.race([generatePromise, timeoutPromise]);
       if (text) {
         return text;
       }
     } catch (err: any) {
-      console.warn(`Model ${modelName} failed, trying fallback:`, err?.message || err);
+      console.warn(`[Speed Optimization] Model ${modelName} bỏ qua, chuyển model kế tiếp:`, err?.message || err);
       lastError = err;
-      // Continue to next fallback model
+      // Chuyển ngay lập tức sang model dự phòng
     }
   }
 
   throw new Error(
-    lastError?.message || "Không thể tạo nội dung từ AI với tất cả các models khả dụng."
+    lastError?.message || "Không thể tạo nội dung từ AI. Vui lòng kiểm tra lại kết nối mạng hoặc API Key."
   );
 }
